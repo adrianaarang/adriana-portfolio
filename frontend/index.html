@@ -199,7 +199,7 @@
    lo despliegues (Render, Railway, Fly.io...). En local, deja
    la de abajo mientras pruebas con `uvicorn main:app --reload`.
    ============================================================ */
-const CONTACT_API_URL = 'https://adriana-web-backend.onrender.com/contact';
+const CONTACT_API_URL = 'https://adriana-portfolio.onrender.com/contact';
 
 /* ============================================================
    CONTENIDO REAL — modales del juego (incluye el formulario)
@@ -368,7 +368,7 @@ function wireContactForm(){
     statusEl.textContent = 'Enviando… si el servidor llevaba un rato dormido puede tardar hasta 1 minuto, espera un momento.';
     try{
       const controller = new AbortController();
-      const timeoutId = setTimeout(()=>controller.abort(), 55000); // 55s de margen para el "despertar" del servidor
+      const timeoutId = setTimeout(()=>controller.abort(), 90000); // 90s de margen para el "despertar" del servidor
       const res = await fetch(CONTACT_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -480,16 +480,16 @@ MIS SKILLS: Python, PHP, JavaScript, SQL, Scikit-learn, pandas, AWS, Docker, Scr
 MI CONTACTO: adriaranguez89@gmail.com · +34 618 048 787 · linkedin.com/in/adriana-aranguez · github.com/adrianaarang.
 `;
 let chatHistory = [];
+const CHAT_API_URL = 'https://adriana-portfolio.onrender.com/chat';
 async function askAdrIALive(question){
-  const messages = [...chatHistory, { role:'user', content:question }];
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const response = await fetch(CHAT_API_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:500, system:ADRIANA_CONTEXT, messages })
+    body: JSON.stringify({ message: question, history: chatHistory })
   });
   if (!response.ok) throw new Error("API error " + response.status);
   const data = await response.json();
-  const text = data.content.map(b=>b.text||"").join("\n").trim();
+  const text = (data.answer || "").trim();
   if (!text) throw new Error("Respuesta vacía");
   chatHistory.push({role:'user',content:question}); chatHistory.push({role:'assistant',content:text});
   if (chatHistory.length>12) chatHistory = chatHistory.slice(-12);
