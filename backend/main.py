@@ -32,12 +32,13 @@ app = FastAPI(title="Adriana Portfolio — Contact API")
 # (por ejemplo: ["https://adriana-portfolio.netlify.app"])
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://adrianaaranguez.es", "https://www.adrianaaranguez.es"],,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "contacts.db")
+
 
 
 def get_connection():
