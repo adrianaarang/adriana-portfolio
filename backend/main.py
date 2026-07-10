@@ -28,11 +28,9 @@ from pydantic import BaseModel, EmailStr, field_validator
 
 app = FastAPI(title="Adriana Portfolio — Contact API")
 
-# En producción, cambia "*" por el dominio real donde publiques la web
-# (por ejemplo: ["https://adriana-portfolio.netlify.app"])
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://adrianaaranguez.es", "https://www.adrianaaranguez.es"],,
+    allow_origins=["https://adrianaaranguez.es", "https://www.adrianaaranguez.es"],
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
