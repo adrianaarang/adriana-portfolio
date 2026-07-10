@@ -21,6 +21,7 @@ import os
 import sqlite3
 from datetime import datetime, timezone
 
+import requests
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, field_validator
@@ -115,49 +116,49 @@ def list_contacts():
 
 def send_email_notification(form: ContactForm) -> None:
     """
-    Envía un email de notificación a Adriana cuando llega un mensaje nuevo.
-    Necesita estas variables de entorno configuradas en el servidor donde
-    despliegues el backend (NUNCA las escribas en este archivo ni en el chat):
-        SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
+    Envía un email de notificación a Adriana cuando llega un mensaje nuevo,
+    usando la API HTTPS de Brevo (antes Sendinblue) en vez de SMTP.
+
+    ¿Por qué no SMTP? Render bloquea el tráfico saliente a los puertos SMTP
+    (25, 465, 587) en el plan gratuito para prevenir spam. La API de Brevo
+    funciona por HTTPS normal (puerto 443), que nunca está bloqueado.
+
+    Necesita estas variables de entorno configuradas en Render (NUNCA las
+    escribas en este archivo ni las compartas):
+        BREVO_API_KEY   — tu clave de API (Brevo → SMTP & API → API Keys)
+        BREVO_SENDER    — el email verificado como remitente en Brevo
     Opcional: NOTIFY_EMAIL (si no se configura, usa adriaranguez89@gmail.com).
 
-    Con Gmail: SMTP_HOST=smtp.gmail.com, SMTP_PORT=587, SMTP_USER=tu Gmail,
-    SMTP_PASS= una "contraseña de aplicación" (no tu contraseña normal — se
-    genera en https://myaccount.google.com/apppasswords, requiere tener
-    la verificación en dos pasos activada).
+    Cómo conseguir BREVO_API_KEY:
+    1. Crea una cuenta gratis en https://www.brevo.com (300 emails/día gratis).
+    2. Ve a "SMTP & API" → pestaña "API Keys" → "Generate a new API key".
+    3. En "Senders" verifica el email desde el que quieres enviar (puede ser
+       tu propio Gmail: Brevo te manda un email de confirmación).
     """
-    import smtplib
-    import socket
-    from email.message import EmailMessage
-
-    host = os.environ.get("SMTP_HOST")
-    port = int(os.environ.get("SMTP_PORT", "587"))
-    user = os.environ.get("SMTP_USER")
-    password = os.environ.get("SMTP_PASS")
+    api_key = os.environ.get("BREVO_API_KEY")
+    sender_email = os.environ.get("BREVO_SENDER")
     to_email = os.environ.get("NOTIFY_EMAIL", "adriaranguez89@gmail.com")
 
-    if not all([host, user, password]):
-        print("[aviso] Envío de email no configurado (faltan SMTP_HOST/SMTP_USER/SMTP_PASS). "
+    if not all([api_key, sender_email]):
+        print("[aviso] Envío de email no configurado (faltan BREVO_API_KEY/BREVO_SENDER). "
               "El mensaje ya quedó guardado en contacts.db de todas formas.")
         return
 
-    msg = EmailMessage()
-    msg["Subject"] = f"Nuevo mensaje de {form.name} (portfolio)"
-    msg["From"] = user
-    msg["To"] = to_email
-    msg["Reply-To"] = form.email
-    msg.set_content(f"De: {form.name} <{form.email}>\n\n{form.message}")
-
-    # Algunos hostings (Render incluido) no tienen salida IPv6, y smtp.gmail.com
-    # resuelve a direcciones IPv6 además de IPv4. Forzamos IPv4 explícitamente
-    # para evitar el error "Network is unreachable".
-    addr_info = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
-    ipv4_addr = addr_info[0][4][0]
-
-    server = smtplib.SMTP(timeout=20)
-    server.connect(ipv4_addr, port)
-    server._host = host  # para que starttls valide el certificado contra el nombre real, no la IP
-    server.starttls()
-    server.login(user, password)
-    server.send_message(msg)
-    server.quit()
+    response = requests.post(
+        "https://api.brevo.com/v3/smtp/email",
+        headers={
+            "api-key": api_key,
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+        json={
+            "sender": {"email": sender_email, "name": "Portfolio de Adriana"},
+            "to": [{"email": to_email}],
+            "replyTo": {"email": form.email, "name": form.name},
+            "subject": f"Nuevo mensaje de {form.name} (portfolio)",
+            "textContent": f"De: {form.name} <{form.email}>\n\n{form.message}",
+        },
+        timeout=15,
+    )
+    if response.status_code >= 300:
+        raise RuntimeError(f"Brevo respondió {response.status_code}: {response.text}")
