@@ -199,7 +199,7 @@
    lo despliegues (Render, Railway, Fly.io...). En local, deja
    la de abajo mientras pruebas con `uvicorn main:app --reload`.
    ============================================================ */
-const CONTACT_API_URL = 'http://localhost:8000/contact';
+const CONTACT_API_URL = 'https://adriana-web-backend.onrender.com/contact';
 
 /* ============================================================
    CONTENIDO REAL — modales del juego (incluye el formulario)
@@ -365,13 +365,17 @@ function wireContactForm(){
     };
     btn.disabled = true; btn.textContent = 'ENVIANDO...';
     statusEl.style.color = '#4a4a3a';
-    statusEl.textContent = '';
+    statusEl.textContent = 'Enviando… si el servidor llevaba un rato dormido puede tardar hasta 1 minuto, espera un momento.';
     try{
+      const controller = new AbortController();
+      const timeoutId = setTimeout(()=>controller.abort(), 55000); // 55s de margen para el "despertar" del servidor
       const res = await fetch(CONTACT_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
       if (!res.ok) throw new Error('Respuesta no OK: ' + res.status);
       statusEl.style.color = '#1f7a45';
       statusEl.textContent = '¡Mensaje enviado! Te responderá en breve.';

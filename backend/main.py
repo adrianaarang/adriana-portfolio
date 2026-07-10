@@ -127,6 +127,7 @@ def send_email_notification(form: ContactForm) -> None:
     la verificación en dos pasos activada).
     """
     import smtplib
+    import socket
     from email.message import EmailMessage
 
     host = os.environ.get("SMTP_HOST")
@@ -147,7 +148,16 @@ def send_email_notification(form: ContactForm) -> None:
     msg["Reply-To"] = form.email
     msg.set_content(f"De: {form.name} <{form.email}>\n\n{form.message}")
 
-    with smtplib.SMTP(host, port) as server:
-        server.starttls()
-        server.login(user, password)
-        server.send_message(msg)
+    # Algunos hostings (Render incluido) no tienen salida IPv6, y smtp.gmail.com
+    # resuelve a direcciones IPv6 además de IPv4. Forzamos IPv4 explícitamente
+    # para evitar el error "Network is unreachable".
+    addr_info = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
+    ipv4_addr = addr_info[0][4][0]
+
+    server = smtplib.SMTP(timeout=20)
+    server.connect(ipv4_addr, port)
+    server._host = host  # para que starttls valide el certificado contra el nombre real, no la IP
+    server.starttls()
+    server.login(user, password)
+    server.send_message(msg)
+    server.quit()
